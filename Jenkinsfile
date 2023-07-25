@@ -1,37 +1,52 @@
 pipeline {
-    agent {
-        label {
-        label "built-in"
-        customWorkspace "/root/pramod/app"
-        }
+    agent any
+
+    // Define the environment variables
+    environment {
+        GIT_BRANCH = 'main' // Change this to the desired branch name
     }
+    // running container stop
     stages {
-       stage ("clone") {
-           steps {
-               sh "cd /root/pramod/app"
-               sh "rm -rf * "
-                sh "git clone https://github.com/sunilpatil77/game-of-life.git"
+    stage ('docker-container-stop') {
+    steps {
+          sh 'docker stop workpress_app'
+          sh 'docker remove wordpress_app'
+}
+}
+        stage('Checkout') {
+            steps {
+                // Clean workspace and checkout the repository
+                cleanWs()
+                checkout scm
             }
         }
-        stage ("maven") {
+
+        stage('Git Pull') {
+            when {
+                // Trigger the stage only when changes are pushed to the main branch
+                branch 'main'
+                changeset '.*'
+            }
             steps {
-			dir ("/root/pramod/app/game-of-life") {
-              	sh "mvn clean package"		
-			
-			dir ("gameoflife-web/target") {
-                        sh "aws s3 cp gameoflife.war s3://sonu-bucket-77"
-               	}
-           	 	}
-     	}
-        }		
-        stage ("deploy") {
-            agent {
-                node {
-                    label "slave-one"
+                script {
+                    // Get the latest changes from the remote main branch
+                    sh "git pull origin ${env.GIT_BRANCH}"
                 }
             }
-            steps {
-                sh "aws s3 cp s3://sonu-bucket-77/gameoflife.war /server/tomcat/apache-tomcat-9.0.71/webapps"        
+       // start container
+        stage('start-container') {
+        steps {
+
+             sh 'docker run -it --network my_network  wordpress_app'
+}
+    
+}
+
+        }	
+
+    
+    }
+}      
         	}
         }
     }
